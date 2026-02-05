@@ -22,7 +22,7 @@
 - **APIs**: 
   - [FortniteAPI.io](https://fortniteapi.io) - Player statistics
   - [OpenAI API](https://openai.com/api/) - AI-powered feedback generation
-- **Hosting**: Render (Dockerized Deployment)
+- **Hosting**: Azure
 - **Development Tools**: Visual Studio 2022, Git, GitHub
 
 ## 🧩 Getting Started (Local Setup)
@@ -84,30 +84,12 @@ Create a file named `appsettings.Development.json` in the root directory (this f
 
 ## 🌐 Deployment
 
-This app is deployed using Docker on [Render](https://render.com).
+This app is deployed using Docker on [Azure](https://).
 
 ### Environment Variables for Production
 Set the following environment variables in your hosting platform:
 - `FortniteAPI__Key`: Your FortniteAPI.io key
 - `OpenAISettings__ApiKey`: Your OpenAI API key
-
-## 🎨 Recent Updates
-
-### Version 2.0 Features
-- **Enhanced AI Feedback**: Completely redesigned feedback system with structured, concise analysis
-- **Improved Visual Design**: Removed white boxes from stats display for cleaner appearance
-- **Better UX**: Left-aligned feedback text with proper bullet point formatting
-- **Optimized Performance**: Reduced AI response length for faster loading
-
-## 💡 Future Improvements
-
-- Add search history tracking and charts for long-term player progress
-- Integrate OAuth login to allow players to save favorite usernames
-- Global leaderboard by game mode
-- Dark mode toggle
-- API usage dashboard
-- Advanced AI coaching with match-specific recommendations
-- Player comparison tools
 
 ## 📄 License
 
