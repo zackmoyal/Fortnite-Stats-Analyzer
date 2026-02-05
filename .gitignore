@@ -1,0 +1,18 @@
+# Ignore build artifacts
+bin/
+obj/
+
+# Ignore Visual Studio/JetBrains Rider settings
+.vs/
+*.user
+*.suo
+
+# Editor configs
+.vscode/
+.idea/
+
+# Ignore logs
+*.log
+
+# Local development secrets
+appsettings.Development.json

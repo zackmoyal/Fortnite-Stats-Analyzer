@@ -1,0 +1,81 @@
+@model string
+
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content fortnite-modal">
+            <div class="modal-header fortnite-modal-header">
+                <h5 class="modal-title" id="errorModalLabel">Fortnite Error</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body fortnite-modal-body">
+                <div class="error-icon">
+                    <i class="fas fa-exclamation-triangle fa-4x"></i>
+                </div>
+                <p class="error-message">@Model</p>
+            </div>
+            <div class="modal-footer fortnite-modal-footer">
+                <button type="button" class="btn fortnite-btn" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .fortnite-modal {
+        background-color: #1a1a1a;
+        border: 2px solid #feda4a;
+        border-radius: 10px;
+        color: #ffffff;
+    }
+
+    .fortnite-modal-header {
+        background-color: #2a2a2a;
+        border-bottom: 2px solid #feda4a;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+
+    .fortnite-modal-body {
+        background-color: #1a1a1a;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .fortnite-modal-footer {
+        background-color: #2a2a2a;
+        border-top: 2px solid #feda4a;
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+    }
+
+    .error-icon {
+        margin-bottom: 20px;
+        color: #feda4a;
+    }
+
+    .error-message {
+        font-size: 1.2rem;
+        color: #feda4a;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .fortnite-btn {
+        background-color: #feda4a;
+        color: #000000;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        text-transform: uppercase;
+        transition: all 0.3s ease;
+    }
+
+    .fortnite-btn:hover {
+        background-color: #ffcc00;
+        transform: scale(1.05);
+    }
+
+    .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
+</style> 

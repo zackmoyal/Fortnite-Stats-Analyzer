@@ -1,0 +1,321 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="page-content">
+    <div class="logo-section">
+        <div class="logo-container">
+            <img class="logo" src="/images/fortnite-logo.png" alt="Fortnite Logo" />
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="search-container">
+            <h1 class="text-center mb-4">Fortnite Stats Analyzer</h1>
+            <p class="text-center description">Enter your Fortnite username to get detailed stats analysis and personalized feedback for improvement!</p>
+            <p class="text-center" style="color: #feda4a; font-size: 0.9rem; margin-bottom: 1rem;">
+                <strong>Note:</strong> Only Battle Royale statistics are displayed. If no stats appear, the player may not have recent BR activity or stats may be set to private.
+            </p>
+            
+            <form id="statsForm" asp-controller="Home" asp-action="GetStats" method="post" class="search-form">
+                <div class="input-group">
+                    <input type="text" id="username" name="username" class="form-control" placeholder="Enter Fortnite Username" required />
+                    <button id="submitButton" type="submit" class="btn btn-fortnite">
+                        <span class="button-text">Get Stats</span>
+                    </button>
+                </div>
+            </form>
+
+            @if (!string.IsNullOrEmpty(ViewBag.Error))
+            {
+                <div class="alert alert-danger mt-3" role="alert">
+                    @ViewBag.Error
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="fortnite-spinner"></div>
+            <h3 id="loadingMessage" class="loading-message">Fetching player stats...</h3>
+            <p id="loadingTip" class="loading-tip">Did you know? The average Fortnite match lasts 20 minutes!</p>
+            <div class="loading-progress">
+                <div id="progressBar" class="progress-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal" id="errorModal" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> 
+                    Error
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='/'">Return Home</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .description {
+            color: #fff;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .search-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            border: 4px solid #feda4a;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+            animation: glow 1.5s infinite alternate;
+        }
+
+        @@keyframes glow {
+            from { border-color: #feda4a; }
+            to { border-color: #0a74da; }
+        }
+
+        .search-form {
+            margin-top: 2rem;
+            margin-bottom: 0;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: stretch;
+            gap: 0.5rem;
+            border: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .form-control {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid transparent;
+            border-radius: 15px 0 0 15px;
+            color: #fff;
+            padding: 1rem;
+            font-size: 1.1rem;
+            height: 60px;
+            line-height: 60px;
+            background-image: linear-gradient(#000, #000), linear-gradient(45deg, #0a74da, #feda4a);
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+            box-shadow: none;
+        }
+
+        .form-control:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #feda4a66;
+        }
+
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .btn-fortnite {
+            background: linear-gradient(45deg, #0a74da, #feda4a);
+            border: none;
+            color: #000;
+            padding: 0 2rem;
+            height: 60px;
+            line-height: 60px;
+            font-weight: bold;
+            font-size: 1.9rem;
+            min-width: 180px;
+            text-transform: capitalize;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border-radius: 0 15px 15px 0;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-fortnite::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: 0.5s;
+            border-radius: 15px;
+        }
+
+        .btn-fortnite:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #feda4a, 0 0 30px #feda4a;
+        }
+
+        .btn-fortnite:hover::before {
+            left: 100%;
+        }
+
+        .btn-fortnite:disabled {
+            background: linear-gradient(45deg, #7fb8cf, #e6c976);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal-content {
+            background: #2d2d2d;
+            color: #fff;
+            border: 2px solid #feda4a;
+        }
+
+        .modal-header {
+            border-bottom: 1px solid #feda4a;
+        }
+
+        .modal-footer {
+            border-top: 1px solid #feda4a;
+        }
+
+        .spinner-border {
+            margin-right: 0.5rem;
+        }
+
+        /* Loading Overlay Styles */
+        .loading-overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+            .loading-overlay.active {
+                display: flex;
+            }
+
+        .loading-content {
+            text-align: center;
+            max-width: 500px;
+            padding: 2rem;
+        }
+
+        /* Fortnite-themed Spinner */
+        .fortnite-spinner {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 2rem;
+            border: 8px solid transparent;
+            border-top: 8px solid #0a74da;
+            border-right: 8px solid #feda4a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @@keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-message {
+            color: #feda4a;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 10px rgba(254, 218, 74, 0.5);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @@keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .loading-tip {
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+            font-style: italic;
+        }
+
+        /* Progress Bar */
+        .loading-progress {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0a74da, #feda4a);
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: progressGlow 2s ease-in-out infinite;
+        }
+
+        @@keyframes progressGlow {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(254, 218, 74, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(254, 218, 74, 0.8);
+            }
+        }
+    </style>
+}
+
+@section Scripts {
+    <script src="~/js/site.js"></script>
+}

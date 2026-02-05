@@ -1,0 +1,1132 @@
+﻿@using FortniteStatsAnalyzer.Services
+@inject IFortniteStatsService FortniteStatsService
+@model FortniteStatsResponse
+@inject FortniteStatsAnalyzer.Services.IOpenAIService OpenAIService
+@{
+    ViewData["Title"] = "Player Stats";
+}
+
+<header>
+    <div class="logo-container">
+        <img class="logo" src="/images/fortnite-logo.png" alt="Fortnite Logo" />
+    </div>
+</header>
+
+<div class="header-box">
+    <h1>
+        @(string.IsNullOrWhiteSpace(Model?.Name)
+                ? "Fortnite Stats"
+                : $"{Model!.Name}'s Fortnite Stats")
+    </h1>
+</div>
+
+<!-- Toggle Tabs -->
+<div class="tab-container">
+    <button class="tab-button active" onclick="showStats('global')">Global Stats</button>
+    <button class="tab-button" onclick="showStats('input')">Per Input Stats</button>
+</div>
+
+<!-- ==================== Global Stats ==================== -->
+<div id="global-stats" class="stats-section">
+    <h2>Global Stats</h2>
+
+    @{
+        var hasSolo = Model?.GlobalStats?.Solo is not null;
+        var hasDuo = Model?.GlobalStats?.Duo is not null;
+        var hasSquad = Model?.GlobalStats?.Squad is not null;
+        var hasAnyGlobal = hasSolo || hasDuo || hasSquad;
+    }
+
+    @if (!hasAnyGlobal)
+    {
+        <div class="alert alert-warning">
+            <h4><i class="fas fa-exclamation-triangle"></i> No Battle Royale Statistics Available</h4>
+            <p>No lifetime global Battle Royale stats were returned for this player. This could mean:</p>
+            <ul>
+                <li>The player hasn't played Battle Royale modes recently</li>
+                <li>The player's stats are set to private in their Epic Games account</li>
+                <li>The player primarily plays other Fortnite game modes (Creative, Save the World, etc.)</li>
+            </ul>
+            @if (Model.AccountLevelHistory?.Any() == true)
+            {
+                <p><strong>Note:</strong> This player has been active in Fortnite (see account history above), but their Battle Royale statistics are not publicly accessible.</p>
+            }
+        </div>
+
+        <!-- Show a placeholder table so the layout stays consistent -->
+        <table class="table table-striped mt-3">
+            <thead>
+                <tr>
+                    <th>Game Mode</th>
+                    <th>K/D Ratio</th>
+                    <th>Win Rate</th>
+                    <th>Top 1 Placements</th>
+                    <th>Total Kills</th>
+                    <th>Matches Played</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Solo</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Duo</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Squad</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Still allow feedback generation to explain why there's no data and what to do next -->
+        <button class="btn explore-feedback-btn-global" onclick="showFeedback('global')">Get General Feedback</button>
+    }
+    else
+    {
+        <!-- Victory Royale Overview Cards -->
+        <div class="victory-overview">
+            @{
+                var totalWins = (Model?.GlobalStats?.Solo?.PlaceTop1 ?? 0) + (Model?.GlobalStats?.Duo?.PlaceTop1 ?? 0) + (Model?.GlobalStats?.Squad?.PlaceTop1 ?? 0);
+                var totalMatches = (Model?.GlobalStats?.Solo?.MatchesPlayed ?? 0) + (Model?.GlobalStats?.Duo?.MatchesPlayed ?? 0) + (Model?.GlobalStats?.Squad?.MatchesPlayed ?? 0);
+                var totalKills = (Model?.GlobalStats?.Solo?.Kills ?? 0) + (Model?.GlobalStats?.Duo?.Kills ?? 0) + (Model?.GlobalStats?.Squad?.Kills ?? 0);
+                var totalDeaths = (Model?.GlobalStats?.Solo?.Deaths ?? 0) + (Model?.GlobalStats?.Duo?.Deaths ?? 0) + (Model?.GlobalStats?.Squad?.Deaths ?? 0);
+                var totalMinutes = (Model?.GlobalStats?.Solo?.MinutesPlayed ?? 0) + (Model?.GlobalStats?.Duo?.MinutesPlayed ?? 0) + (Model?.GlobalStats?.Squad?.MinutesPlayed ?? 0);
+                
+                // FIX: Win rate calculation - don't multiply by 100 since we add % in display
+                var overallWinRate = totalMatches > 0 ? (double)totalWins / totalMatches : 0;
+                
+                // FIX: Better K/D calculation
+                var overallKD = totalDeaths > 0 ? (double)totalKills / totalDeaths : (totalKills > 0 ? totalKills : 0);
+                
+                // FIX: Better hours calculation with fallback
+                var hoursPlayed = totalMinutes > 0 ? totalMinutes / 60.0 : 
+                    (totalMatches > 0 ? totalMatches * 15.0 / 60.0 : 0); // Estimate 15 min per match if no data
+            }
+
+            <div class="overview-card">
+                <div class="card-icon">🏆</div>
+                <div class="card-title">VICTORIES</div>
+                <div class="card-stats">
+                    <div class="main-stat">@totalWins</div>
+                    <div class="sub-stat">Win Rate: @((overallWinRate * 100).ToString("F1"))%</div>
+                    <div class="sub-stat">Best Mode: @(GetBestMode())</div>
+                </div>
+            </div>
+
+            <div class="overview-card">
+                <div class="card-icon">⚔️</div>
+                <div class="card-title">COMBAT</div>
+                <div class="card-stats">
+                    <div class="main-stat">@overallKD.ToString("F2")</div>
+                    <div class="sub-stat">Total Kills: @totalKills</div>
+                    <div class="sub-stat">K/D Ratio</div>
+                </div>
+            </div>
+
+            <div class="overview-card">
+                <div class="card-icon">⏱️</div>
+                <div class="card-title">BATTLEFIELD</div>
+                <div class="card-stats">
+                    <div class="main-stat">@hoursPlayed.ToString("F1")h</div>
+                    <div class="sub-stat">Matches: @totalMatches</div>
+                    <div class="sub-stat">Experience</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Battle Royale Mode Cards -->
+        <div class="battle-modes">
+            @* Solo Mode Card *@
+            @if (Model?.GlobalStats?.Solo is { } solo1)
+            {
+                <div class="battle-card">
+                    <div class="battle-card-header">
+                        <span class="mode-icon">🎯</span>
+                        <span class="mode-title">SOLO PERFORMANCE</span>
+                    </div>
+                    <div class="battle-card-content">
+                        <div class="core-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Wins</span>
+                                <span class="stat-value">@solo1.PlaceTop1</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">K/D</span>
+                                <span class="stat-value">@solo1.Kd.ToString("F3")</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Matches</span>
+                                <span class="stat-value">@solo1.MatchesPlayed</span>
+                            </div>
+                        </div>
+
+                        <div class="placement-stats">
+                            @{
+                                var soloWinRate = solo1.MatchesPlayed > 0 ? (double)solo1.PlaceTop1 / solo1.MatchesPlayed * 100 : 0;
+                                var soloTop10Rate = solo1.MatchesPlayed > 0 && solo1.Top10.HasValue ? (double)solo1.Top10.Value / solo1.MatchesPlayed * 100 : 0;
+                                var soloTop25Rate = solo1.MatchesPlayed > 0 && solo1.Top25.HasValue ? (double)solo1.Top25.Value / solo1.MatchesPlayed * 100 : 0;
+                            }
+                            <div class="placement-bar">
+                                <span class="placement-icon">🥇</span>
+                                <span class="placement-label">Victory Royale:</span>
+                                <div class="progress-bar-fortnite">
+                                    <div class="progress-fill" style="width: @Math.Min(soloWinRate * 10, 100)%"></div>
+                                </div>
+                                <span class="placement-percent">@soloWinRate.ToString("F1")%</span>
+                            </div>
+                            
+                            @if (solo1.Top10.HasValue)
+                            {
+                                <div class="placement-bar">
+                                    <span class="placement-icon">🏅</span>
+                                    <span class="placement-label">Top 10:</span>
+                                    <div class="progress-bar-fortnite">
+                                        <div class="progress-fill" style="width: @soloTop10Rate%"></div>
+                                    </div>
+                                    <span class="placement-percent">@soloTop10Rate.ToString("F1")%</span>
+                                </div>
+                            }
+
+                            @if (solo1.Top25.HasValue)
+                            {
+                                <div class="placement-bar">
+                                    <span class="placement-icon">🎖️</span>
+                                    <span class="placement-label">Top 25:</span>
+                                    <div class="progress-bar-fortnite">
+                                        <div class="progress-fill" style="width: @soloTop25Rate%"></div>
+                                    </div>
+                                    <span class="placement-percent">@soloTop25Rate.ToString("F1")%</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="detailed-stats">
+                            <div class="stat-row">
+                                <span class="stat-icon">⚔️</span>
+                                <span class="stat-text">Combat: @solo1.Kills kills • @(solo1.KillsPerMin?.ToString("F1") ?? "0") K/M @(solo1.Deaths.HasValue ? $"• {solo1.Deaths} deaths" : "")</span>
+                            </div>
+                            @if (solo1.MinutesPlayed.HasValue)
+                            {
+                                <div class="stat-row">
+                                    <span class="stat-icon">⏱️</span>
+                                    <span class="stat-text">Time: @solo1.MinutesPlayed minutes @(solo1.PlayersOutlived.HasValue ? $"• {solo1.PlayersOutlived} players outlived" : "")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* Duo Mode Card *@
+            @if (Model?.GlobalStats?.Duo is { } duo1)
+            {
+                <div class="battle-card">
+                    <div class="battle-card-header">
+                        <span class="mode-icon">👥</span>
+                        <span class="mode-title">DUO PERFORMANCE</span>
+                    </div>
+                    <div class="battle-card-content">
+                        <div class="core-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Wins</span>
+                                <span class="stat-value">@duo1.PlaceTop1</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">K/D</span>
+                                <span class="stat-value">@duo1.Kd.ToString("F3")</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Matches</span>
+                                <span class="stat-value">@duo1.MatchesPlayed</span>
+                            </div>
+                        </div>
+
+                        <div class="placement-stats">
+                            @{
+                                var duoWinRate = duo1.MatchesPlayed > 0 ? (double)duo1.PlaceTop1 / duo1.MatchesPlayed * 100 : 0;
+                                var duoTop5Rate = duo1.MatchesPlayed > 0 && duo1.Top5.HasValue ? (double)duo1.Top5.Value / duo1.MatchesPlayed * 100 : 0;
+                                var duoTop12Rate = duo1.MatchesPlayed > 0 && duo1.Top12.HasValue ? (double)duo1.Top12.Value / duo1.MatchesPlayed * 100 : 0;
+                            }
+                            <div class="placement-bar">
+                                <span class="placement-icon">🥇</span>
+                                <span class="placement-label">Victory Royale:</span>
+                                <div class="progress-bar-fortnite">
+                                    <div class="progress-fill" style="width: @Math.Min(duoWinRate * 10, 100)%"></div>
+                                </div>
+                                <span class="placement-percent">@duoWinRate.ToString("F1")%</span>
+                            </div>
+                            
+                            @if (duo1.Top5.HasValue)
+                            {
+                                <div class="placement-bar">
+                                    <span class="placement-icon">🏅</span>
+                                    <span class="placement-label">Top 5:</span>
+                                    <div class="progress-bar-fortnite">
+                                        <div class="progress-fill" style="width: @duoTop5Rate%"></div>
+                                    </div>
+                                    <span class="placement-percent">@duoTop5Rate.ToString("F1")%</span>
+                                </div>
+                            }
+
+                            @if (duo1.Top12.HasValue)
+                            {
+                                <div class="placement-bar">
+                                    <span class="placement-icon">🎖️</span>
+                                    <span class="placement-label">Top 12:</span>
+                                    <div class="progress-bar-fortnite">
+                                        <div class="progress-fill" style="width: @duoTop12Rate%"></div>
+                                    </div>
+                                    <span class="placement-percent">@duoTop12Rate.ToString("F1")%</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="detailed-stats">
+                            <div class="stat-row">
+                                <span class="stat-icon">⚔️</span>
+                                <span class="stat-text">Combat: @duo1.Kills kills • @(duo1.KillsPerMin?.ToString("F1") ?? "0") K/M @(duo1.Deaths.HasValue ? $"• {duo1.Deaths} deaths" : "")</span>
+                            </div>
+                            @if (duo1.MinutesPlayed.HasValue)
+                            {
+                                <div class="stat-row">
+                                    <span class="stat-icon">⏱️</span>
+                                    <span class="stat-text">Time: @duo1.MinutesPlayed minutes @(duo1.PlayersOutlived.HasValue ? $"• {duo1.PlayersOutlived} players outlived" : "")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* Squad Mode Card *@
+            @if (Model?.GlobalStats?.Squad is { } squad1)
+            {
+                <div class="battle-card">
+                    <div class="battle-card-header">
+                        <span class="mode-icon">👨‍👩‍👧‍👦</span>
+                        <span class="mode-title">SQUAD PERFORMANCE</span>
+                    </div>
+                    <div class="battle-card-content">
+                        <div class="core-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Wins</span>
+                                <span class="stat-value">@squad1.PlaceTop1</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">K/D</span>
+                                <span class="stat-value">@squad1.Kd.ToString("F3")</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Matches</span>
+                                <span class="stat-value">@squad1.MatchesPlayed</span>
+                            </div>
+                        </div>
+
+                        <div class="placement-stats">
+                            @{
+                                var squadWinRate = squad1.MatchesPlayed > 0 ? (double)squad1.PlaceTop1 / squad1.MatchesPlayed * 100 : 0;
+                                var squadTop3Rate = squad1.MatchesPlayed > 0 && squad1.Top3.HasValue ? (double)squad1.Top3.Value / squad1.MatchesPlayed * 100 : 0;
+                                var squadTop6Rate = squad1.MatchesPlayed > 0 && squad1.Top6.HasValue ? (double)squad1.Top6.Value / squad1.MatchesPlayed * 100 : 0;
+                            }
+                            <div class="placement-bar">
+                                <span class="placement-icon">🥇</span>
+                                <span class="placement-label">Victory Royale:</span>
+                                <div class="progress-bar-fortnite">
+                                    <div class="progress-fill" style="width: @Math.Min(squadWinRate * 10, 100)%"></div>
+                                </div>
+                                <span class="placement-percent">@squadWinRate.ToString("F1")%</span>
+                            </div>
+                            
+                            @if (squad1.Top3.HasValue)
+                            {
+                                <div class="placement-bar">
+                                    <span class="placement-icon">🥉</span>
+                                    <span class="placement-label">Top 3:</span>
+                                    <div class="progress-bar-fortnite">
+                                        <div class="progress-fill" style="width: @squadTop3Rate%"></div>
+                                    </div>
+                                    <span class="placement-percent">@squadTop3Rate.ToString("F1")%</span>
+                                </div>
+                            }
+
+                            @if (squad1.Top6.HasValue)
+                            {
+                                <div class="placement-bar">
+                                    <span class="placement-icon">🎖️</span>
+                                    <span class="placement-label">Top 6:</span>
+                                    <div class="progress-bar-fortnite">
+                                        <div class="progress-fill" style="width: @squadTop6Rate%"></div>
+                                    </div>
+                                    <span class="placement-percent">@squadTop6Rate.ToString("F1")%</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="detailed-stats">
+                            <div class="stat-row">
+                                <span class="stat-icon">⚔️</span>
+                                <span class="stat-text">Combat: @squad1.Kills kills • @(squad1.KillsPerMin?.ToString("F1") ?? "0") K/M @(squad1.Deaths.HasValue ? $"• {squad1.Deaths} deaths" : "")</span>
+                            </div>
+                            @if (squad1.MinutesPlayed.HasValue)
+                            {
+                                <div class="stat-row">
+                                    <span class="stat-icon">⏱️</span>
+                                    <span class="stat-text">Time: @squad1.MinutesPlayed minutes @(squad1.PlayersOutlived.HasValue ? $"• {squad1.PlayersOutlived} players outlived" : "")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <button class="btn explore-feedback-btn-global" onclick="showFeedback('global')">Explore Global Feedback</button>
+    }
+</div>
+
+<!-- Global Feedback Section -->
+<div id="feedback-global" class="feedback-section" style="display: none;">
+    <h2>Generated Feedback for Global Stats</h2>
+    <hr class="section-divider" />
+
+    @if (Model?.GlobalStats?.Solo is { } solo2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(solo2, "Solo"))</p>
+        <hr />
+    }
+
+    @if (Model?.GlobalStats?.Duo is { } duo2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(duo2, "Duo"))</p>
+        <hr />
+    }
+
+    @if (Model?.GlobalStats?.Squad is { } squad2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(squad2, "Squad"))</p>
+        <hr />
+    }
+
+    @* If no global modes, still produce a "no data" advice using zeros *@
+    @if (!(Model?.GlobalStats?.Solo is { }) && !(Model?.GlobalStats?.Duo is { }) && !(Model?.GlobalStats?.Squad is { }))
+    {
+        <p>@Html.Raw(await GenerateNoDataFeedback("Overall (No Data)"))</p>
+    }
+</div>
+
+<!-- ==================== Per Input Stats ==================== -->
+<div id="input-stats" class="stats-section" style="display: none;">
+    <h2>Per Input Stats</h2>
+
+    @{
+        var gp = Model?.PerInput?.Gamepad;
+        var km = Model?.PerInput?.KeyboardMouse;
+        var hasAnyInput =
+        gp?.Solo is not null || gp?.Duo is not null || gp?.Squad is not null ||
+        km?.Solo is not null || km?.Duo is not null || km?.Squad is not null;
+    }
+
+    @if (!hasAnyInput)
+    {
+        <div class="alert alert-info mt-3">
+            <strong>No Per-Input Stats Available</strong><br />
+            This player has no input-specific Battle Royale statistics. This means no data is available for different input methods (Console/Computer).
+        </div>
+
+        <table class="table table-striped mt-3">
+            <thead>
+                <tr>
+                    <th>Game Mode (Input Method)</th>
+                    <th>K/D Ratio</th>
+                    <th>Win Rate</th>
+                    <th>Top 1 Placements</th>
+                    <th>Total Kills</th>
+                    <th>Matches Played</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Solo (Console)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Duo (Console)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Squad (Console)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Solo (Computer)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Duo (Computer)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+                <tr><td>Squad (Computer)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <button class="btn explore-feedback-btn-input" onclick="showFeedback('input')">Get General Feedback</button>
+    }
+    else
+    {
+        <!-- Per Input Overview Section -->
+        <div class="battle-modes">
+            @* Console (Gamepad) Stats *@
+            @{
+                var hasConsoleStats = Model?.PerInput?.Gamepad?.Solo is not null ||
+                Model?.PerInput?.Gamepad?.Duo is not null ||
+                Model?.PerInput?.Gamepad?.Squad is not null;
+            }
+
+            @if (hasConsoleStats)
+            {
+                <div class="battle-card">
+                    <div class="battle-card-header">
+                        <span class="mode-icon">🎮</span>
+                        <span class="mode-title">CONSOLE PERFORMANCE</span>
+                    </div>
+                    <div class="battle-card-content">
+                        @* Solo Console *@
+                        @if (Model?.PerInput?.Gamepad?.Solo is { } gpSolo)
+                        {
+                            <div class="mode-subsection">
+                                <h4 class="subsection-title">🎯 Solo (Console)</h4>
+                                <div class="core-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Wins</span>
+                                        <span class="stat-value">@gpSolo.PlaceTop1</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">K/D</span>
+                                        <span class="stat-value">@gpSolo.Kd.ToString("F3")</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Matches</span>
+                                        <span class="stat-value">@gpSolo.MatchesPlayed</span>
+                                    </div>
+                                </div>
+
+                                <div class="placement-stats">
+                                    @{
+                                        var gpSoloWinRate = gpSolo.MatchesPlayed > 0 ? (double)gpSolo.PlaceTop1 / gpSolo.MatchesPlayed * 100 : 0;
+                                        var gpSoloTop10Rate = gpSolo.MatchesPlayed > 0 && gpSolo.Top10.HasValue ? (double)gpSolo.Top10.Value / gpSolo.MatchesPlayed * 100 : 0;
+                                        var gpSoloTop25Rate = gpSolo.MatchesPlayed > 0 && gpSolo.Top25.HasValue ? (double)gpSolo.Top25.Value / gpSolo.MatchesPlayed * 100 : 0;
+                                    }
+                                    <div class="placement-bar">
+                                        <span class="placement-icon">🥇</span>
+                                        <span class="placement-label">Victory Royale:</span>
+                                        <div class="progress-bar-fortnite">
+                                            <div class="progress-fill" style="width: @Math.Min(gpSoloWinRate * 10, 100)%"></div>
+                                        </div>
+                                        <span class="placement-percent">@gpSoloWinRate.ToString("F1")%</span>
+                                    </div>
+
+                                    @if (gpSolo.Top10.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🏅</span>
+                                            <span class="placement-label">Top 10:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @gpSoloTop10Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@gpSoloTop10Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+
+                                    @if (gpSolo.Top25.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🎖️</span>
+                                            <span class="placement-label">Top 25:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @gpSoloTop25Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@gpSoloTop25Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="detailed-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-icon">⚔️</span>
+                                        <span class="stat-text">Combat: @gpSolo.Kills kills • @(gpSolo.KillsPerMin?.ToString("F1") ?? "0") K/M @(gpSolo.Deaths.HasValue ? $"• {gpSolo.Deaths} deaths" : "")</span>
+                                    </div>
+                                    @if (gpSolo.MinutesPlayed.HasValue)
+                                    {
+                                        <div class="stat-row">
+                                            <span class="stat-icon">⏱️</span>
+                                            <span class="stat-text">Time: @gpSolo.MinutesPlayed minutes @(gpSolo.PlayersOutlived.HasValue ? $"• {gpSolo.PlayersOutlived} players outlived" : "")</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @* Duo Console *@
+                        @if (Model?.PerInput?.Gamepad?.Duo is { } gpDuo)
+                        {
+                            <div class="mode-subsection">
+                                <h4 class="subsection-title">👥 Duo (Console)</h4>
+                                <div class="core-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Wins</span>
+                                        <span class="stat-value">@gpDuo.PlaceTop1</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">K/D</span>
+                                        <span class="stat-value">@gpDuo.Kd.ToString("F3")</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Matches</span>
+                                        <span class="stat-value">@gpDuo.MatchesPlayed</span>
+                                    </div>
+                                </div>
+
+                                <div class="placement-stats">
+                                    @{
+                                        var gpDuoWinRate = gpDuo.MatchesPlayed > 0 ? (double)gpDuo.PlaceTop1 / gpDuo.MatchesPlayed * 100 : 0;
+                                        var gpDuoTop5Rate = gpDuo.MatchesPlayed > 0 && gpDuo.Top5.HasValue ? (double)gpDuo.Top5.Value / gpDuo.MatchesPlayed * 100 : 0;
+                                        var gpDuoTop12Rate = gpDuo.MatchesPlayed > 0 && gpDuo.Top12.HasValue ? (double)gpDuo.Top12.Value / gpDuo.MatchesPlayed * 100 : 0;
+                                    }
+                                    <div class="placement-bar">
+                                        <span class="placement-icon">🥇</span>
+                                        <span class="placement-label">Victory Royale:</span>
+                                        <div class="progress-bar-fortnite">
+                                            <div class="progress-fill" style="width: @Math.Min(gpDuoWinRate * 10, 100)%"></div>
+                                        </div>
+                                        <span class="placement-percent">@gpDuoWinRate.ToString("F1")%</span>
+                                    </div>
+
+                                    @if (gpDuo.Top5.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🏅</span>
+                                            <span class="placement-label">Top 5:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @gpDuoTop5Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@gpDuoTop5Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+
+                                    @if (gpDuo.Top12.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🎖️</span>
+                                            <span class="placement-label">Top 12:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @gpDuoTop12Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@gpDuoTop12Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="detailed-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-icon">⚔️</span>
+                                        <span class="stat-text">Combat: @gpDuo.Kills kills • @(gpDuo.KillsPerMin?.ToString("F1") ?? "0") K/M @(gpDuo.Deaths.HasValue ? $"• {gpDuo.Deaths} deaths" : "")</span>
+                                    </div>
+                                    @if (gpDuo.MinutesPlayed.HasValue)
+                                    {
+                                        <div class="stat-row">
+                                            <span class="stat-icon">⏱️</span>
+                                            <span class="stat-text">Time: @gpDuo.MinutesPlayed minutes @(gpDuo.PlayersOutlived.HasValue ? $"• {gpDuo.PlayersOutlived} players outlived" : "")</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @* Squad Console *@
+                        @if (Model?.PerInput?.Gamepad?.Squad is { } gpSquad)
+                        {
+                            <div class="mode-subsection">
+                                <h4 class="subsection-title">👥👥 Squad (Console)</h4>
+                                <div class="core-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Wins</span>
+                                        <span class="stat-value">@gpSquad.PlaceTop1</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">K/D</span>
+                                        <span class="stat-value">@gpSquad.Kd.ToString("F3")</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Matches</span>
+                                        <span class="stat-value">@gpSquad.MatchesPlayed</span>
+                                    </div>
+                                </div>
+
+                                <div class="placement-stats">
+                                    @{
+                                        var gpSquadWinRate = gpSquad.MatchesPlayed > 0 ? (double)gpSquad.PlaceTop1 / gpSquad.MatchesPlayed * 100 : 0;
+                                        var gpSquadTop3Rate = gpSquad.MatchesPlayed > 0 && gpSquad.Top3.HasValue ? (double)gpSquad.Top3.Value / gpSquad.MatchesPlayed * 100 : 0;
+                                        var gpSquadTop6Rate = gpSquad.MatchesPlayed > 0 && gpSquad.Top6.HasValue ? (double)gpSquad.Top6.Value / gpSquad.MatchesPlayed * 100 : 0;
+                                    }
+                                    <div class="placement-bar">
+                                        <span class="placement-icon">🥇</span>
+                                        <span class="placement-label">Victory Royale:</span>
+                                        <div class="progress-bar-fortnite">
+                                            <div class="progress-fill" style="width: @Math.Min(gpSquadWinRate * 10, 100)%"></div>
+                                        </div>
+                                        <span class="placement-percent">@gpSquadWinRate.ToString("F1")%</span>
+                                    </div>
+
+                                    @if (gpSquad.Top3.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🏅</span>
+                                            <span class="placement-label">Top 3:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @gpSquadTop3Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@gpSquadTop3Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+
+                                    @if (gpSquad.Top6.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🎖️</span>
+                                            <span class="placement-label">Top 6:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @gpSquadTop6Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@gpSquadTop6Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="detailed-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-icon">⚔️</span>
+                                        <span class="stat-text">Combat: @gpSquad.Kills kills • @(gpSquad.KillsPerMin?.ToString("F1") ?? "0") K/M @(gpSquad.Deaths.HasValue ? $"• {gpSquad.Deaths} deaths" : "")</span>
+                                    </div>
+                                    @if (gpSquad.MinutesPlayed.HasValue)
+                                    {
+                                        <div class="stat-row">
+                                            <span class="stat-icon">⏱️</span>
+                                            <span class="stat-text">Time: @gpSquad.MinutesPlayed minutes @(gpSquad.PlayersOutlived.HasValue ? $"• {gpSquad.PlayersOutlived} players outlived" : "")</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* Computer (Keyboard & Mouse) Stats *@
+            @{
+                var hasComputerStats = Model?.PerInput?.KeyboardMouse?.Solo is not null ||
+                Model?.PerInput?.KeyboardMouse?.Duo is not null ||
+                Model?.PerInput?.KeyboardMouse?.Squad is not null;
+            }
+
+            @if (hasComputerStats)
+            {
+                <div class="battle-card">
+                    <div class="battle-card-header">
+                        <span class="mode-icon">⌨️</span>
+                        <span class="mode-title">COMPUTER PERFORMANCE</span>
+                    </div>
+                    <div class="battle-card-content">
+                        @* Solo Computer *@
+                        @if (Model?.PerInput?.KeyboardMouse?.Solo is { } kmSolo)
+                        {
+                            <div class="mode-subsection">
+                                <h4 class="subsection-title">🎯 Solo (Computer)</h4>
+                                <div class="core-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Wins</span>
+                                        <span class="stat-value">@kmSolo.PlaceTop1</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">K/D</span>
+                                        <span class="stat-value">@kmSolo.Kd.ToString("F3")</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Matches</span>
+                                        <span class="stat-value">@kmSolo.MatchesPlayed</span>
+                                    </div>
+                                </div>
+
+                                <div class="placement-stats">
+                                    @{
+                                        var kmSoloWinRate = kmSolo.MatchesPlayed > 0 ? (double)kmSolo.PlaceTop1 / kmSolo.MatchesPlayed * 100 : 0;
+                                        var kmSoloTop10Rate = kmSolo.MatchesPlayed > 0 && kmSolo.Top10.HasValue ? (double)kmSolo.Top10.Value / kmSolo.MatchesPlayed * 100 : 0;
+                                        var kmSoloTop25Rate = kmSolo.MatchesPlayed > 0 && kmSolo.Top25.HasValue ? (double)kmSolo.Top25.Value / kmSolo.MatchesPlayed * 100 : 0;
+                                    }
+                                    <div class="placement-bar">
+                                        <span class="placement-icon">🥇</span>
+                                        <span class="placement-label">Victory Royale:</span>
+                                        <div class="progress-bar-fortnite">
+                                            <div class="progress-fill" style="width: @Math.Min(kmSoloWinRate * 10, 100)%"></div>
+                                        </div>
+                                        <span class="placement-percent">@kmSoloWinRate.ToString("F1")%</span>
+                                    </div>
+
+                                    @if (kmSolo.Top10.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🏅</span>
+                                            <span class="placement-label">Top 10:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @kmSoloTop10Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@kmSoloTop10Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+
+                                    @if (kmSolo.Top25.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🎖️</span>
+                                            <span class="placement-label">Top 25:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @kmSoloTop25Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@kmSoloTop25Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="detailed-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-icon">⚔️</span>
+                                        <span class="stat-text">Combat: @kmSolo.Kills kills • @(kmSolo.KillsPerMin?.ToString("F1") ?? "0") K/M @(kmSolo.Deaths.HasValue ? $"• {kmSolo.Deaths} deaths" : "")</span>
+                                    </div>
+                                    @if (kmSolo.MinutesPlayed.HasValue)
+                                    {
+                                        <div class="stat-row">
+                                            <span class="stat-icon">⏱️</span>
+                                            <span class="stat-text">Time: @kmSolo.MinutesPlayed minutes @(kmSolo.PlayersOutlived.HasValue ? $"• {kmSolo.PlayersOutlived} players outlived" : "")</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @* Duo Computer *@
+                        @if (Model?.PerInput?.KeyboardMouse?.Duo is { } kmDuo)
+                        {
+                            <div class="mode-subsection">
+                                <h4 class="subsection-title">👥 Duo (Computer)</h4>
+                                <div class="core-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Wins</span>
+                                        <span class="stat-value">@kmDuo.PlaceTop1</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">K/D</span>
+                                        <span class="stat-value">@kmDuo.Kd.ToString("F3")</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Matches</span>
+                                        <span class="stat-value">@kmDuo.MatchesPlayed</span>
+                                    </div>
+                                </div>
+
+                                <div class="placement-stats">
+                                    @{
+                                        var kmDuoWinRate = kmDuo.MatchesPlayed > 0 ? (double)kmDuo.PlaceTop1 / kmDuo.MatchesPlayed * 100 : 0;
+                                        var kmDuoTop5Rate = kmDuo.MatchesPlayed > 0 && kmDuo.Top5.HasValue ? (double)kmDuo.Top5.Value / kmDuo.MatchesPlayed * 100 : 0;
+                                        var kmDuoTop12Rate = kmDuo.MatchesPlayed > 0 && kmDuo.Top12.HasValue ? (double)kmDuo.Top12.Value / kmDuo.MatchesPlayed * 100 : 0;
+                                    }
+                                    <div class="placement-bar">
+                                        <span class="placement-icon">🥇</span>
+                                        <span class="placement-label">Victory Royale:</span>
+                                        <div class="progress-bar-fortnite">
+                                            <div class="progress-fill" style="width: @Math.Min(kmDuoWinRate * 10, 100)%"></div>
+                                        </div>
+                                        <span class="placement-percent">@kmDuoWinRate.ToString("F1")%</span>
+                                    </div>
+
+                                    @if (kmDuo.Top5.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🏅</span>
+                                            <span class="placement-label">Top 5:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @kmDuoTop5Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@kmDuoTop5Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+
+                                    @if (kmDuo.Top12.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🎖️</span>
+                                            <span class="placement-label">Top 12:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @kmDuoTop12Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@kmDuoTop12Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="detailed-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-icon">⚔️</span>
+                                        <span class="stat-text">Combat: @kmDuo.Kills kills • @(kmDuo.KillsPerMin?.ToString("F1") ?? "0") K/M @(kmDuo.Deaths.HasValue ? $"• {kmDuo.Deaths} deaths" : "")</span>
+                                    </div>
+                                    @if (kmDuo.MinutesPlayed.HasValue)
+                                    {
+                                        <div class="stat-row">
+                                            <span class="stat-icon">⏱️</span>
+                                            <span class="stat-text">Time: @kmDuo.MinutesPlayed minutes @(kmDuo.PlayersOutlived.HasValue ? $"• {kmDuo.PlayersOutlived} players outlived" : "")</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @* Squad Computer *@
+                        @if (Model?.PerInput?.KeyboardMouse?.Squad is { } kmSquad)
+                        {
+                            <div class="mode-subsection">
+                                <h4 class="subsection-title">👥👥 Squad (Computer)</h4>
+                                <div class="core-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Wins</span>
+                                        <span class="stat-value">@kmSquad.PlaceTop1</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">K/D</span>
+                                        <span class="stat-value">@kmSquad.Kd.ToString("F3")</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Matches</span>
+                                        <span class="stat-value">@kmSquad.MatchesPlayed</span>
+                                    </div>
+                                </div>
+
+                                <div class="placement-stats">
+                                    @{
+                                        var kmSquadWinRate = kmSquad.MatchesPlayed > 0 ? (double)kmSquad.PlaceTop1 / kmSquad.MatchesPlayed * 100 : 0;
+                                        var kmSquadTop3Rate = kmSquad.MatchesPlayed > 0 && kmSquad.Top3.HasValue ? (double)kmSquad.Top3.Value / kmSquad.MatchesPlayed * 100 : 0;
+                                        var kmSquadTop6Rate = kmSquad.MatchesPlayed > 0 && kmSquad.Top6.HasValue ? (double)kmSquad.Top6.Value / kmSquad.MatchesPlayed * 100 : 0;
+                                    }
+                                    <div class="placement-bar">
+                                        <span class="placement-icon">🥇</span>
+                                        <span class="placement-label">Victory Royale:</span>
+                                        <div class="progress-bar-fortnite">
+                                            <div class="progress-fill" style="width: @Math.Min(kmSquadWinRate * 10, 100)%"></div>
+                                        </div>
+                                        <span class="placement-percent">@kmSquadWinRate.ToString("F1")%</span>
+                                    </div>
+
+                                    @if (kmSquad.Top3.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🏅</span>
+                                            <span class="placement-label">Top 3:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @kmSquadTop3Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@kmSquadTop3Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+
+                                    @if (kmSquad.Top6.HasValue)
+                                    {
+                                        <div class="placement-bar">
+                                            <span class="placement-icon">🎖️</span>
+                                            <span class="placement-label">Top 6:</span>
+                                            <div class="progress-bar-fortnite">
+                                                <div class="progress-fill" style="width: @kmSquadTop6Rate%"></div>
+                                            </div>
+                                            <span class="placement-percent">@kmSquadTop6Rate.ToString("F1")%</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="detailed-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-icon">⚔️</span>
+                                        <span class="stat-text">Combat: @kmSquad.Kills kills • @(kmSquad.KillsPerMin?.ToString("F1") ?? "0") K/M @(kmSquad.Deaths.HasValue ? $"• {kmSquad.Deaths} deaths" : "")</span>
+                                    </div>
+                                    @if (kmSquad.MinutesPlayed.HasValue)
+                                    {
+                                        <div class="stat-row">
+                                            <span class="stat-icon">⏱️</span>
+                                            <span class="stat-text">Time: @kmSquad.MinutesPlayed minutes @(kmSquad.PlayersOutlived.HasValue ? $"• {kmSquad.PlayersOutlived} players outlived" : "")</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <button class="btn explore-feedback-btn-input" onclick="showFeedback('input')">Explore Per Input Feedback</button>
+    }
+</div>
+
+<!-- Per Input Feedback Section -->
+<div id="feedback-input" class="feedback-section" style="display: none;">
+    <h2>Generated Feedback for Per Input Stats</h2>
+    <hr class="section-divider" />
+
+    @if (Model?.PerInput?.Gamepad?.Solo is { } gpSolo2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(gpSolo2, "Solo (Console)"))</p>
+        <hr />
+    }
+
+    @if (Model?.PerInput?.Gamepad?.Duo is { } gpDuo2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(gpDuo2, "Duo (Console)"))</p>
+        <hr />
+    }
+
+    @if (Model?.PerInput?.Gamepad?.Squad is { } gpSquad2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(gpSquad2, "Squad (Console)"))</p>
+        <hr />
+    }
+
+    @if (Model?.PerInput?.KeyboardMouse?.Solo is { } kmSolo2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(kmSolo2, "Solo (Computer)"))</p>
+        <hr />
+    }
+
+    @if (Model?.PerInput?.KeyboardMouse?.Duo is { } kmDuo2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(kmDuo2, "Duo (Computer)"))</p>
+        <hr />
+    }
+
+    @if (Model?.PerInput?.KeyboardMouse?.Squad is { } kmSquad2)
+    {
+        <p>@Html.Raw(await GenerateFeedback(kmSquad2, "Squad (Computer)"))</p>
+        <hr />
+    }
+
+    @* If no input modes, still provide general advice *@
+    @if (!hasAnyInput)
+    {
+        <p>@Html.Raw(await GenerateNoDataFeedback("Per Input (No Data)"))</p>
+    }
+</div>
+
+@functions {
+    private async Task<string> GenerateFeedback(GameMode stats, string gameMode)
+    {
+        try
+        {
+            var feedback = await FortniteStatsService.GenerateComprehensiveStatsFeedback(stats, gameMode);
+            var formattedFeedback = FormatAIFeedback(feedback);
+
+            return $"<div class=\"feedback-title\">{gameMode}:</div><div class=\"ai-feedback-content\">{formattedFeedback}</div>";
+        }
+        catch (Exception)
+        {
+            string feedback = $"<div class=\"feedback-title\">{gameMode}:</div><div class=\"ai-feedback-content\">";
+
+            feedback += stats.Kd >= 1.0
+                ? "Your K/D ratio shows strong combat skills. "
+                : "Focus on improving your combat skills through practice. ";
+
+            feedback += stats.Winrate >= 0.1
+                ? "Your win rate demonstrates good strategic thinking. "
+                : "Work on late-game positioning to secure more victories. ";
+
+            feedback += $"With {stats.MatchesPlayed} matches played, keep practicing to enhance your skills!</div>";
+
+            return feedback;
+        }
+    }
+
+    private string FormatAIFeedback(string feedback)
+    {
+        if (string.IsNullOrEmpty(feedback))
+            return feedback;
+
+        // Replace emoji headers with proper HTML formatting
+        feedback = System.Text.RegularExpressions.Regex.Replace(
+            feedback,
+            @"🎯\s*\*\*Performance Analysis\*\*",
+            "<h3 class=\"feedback-section-header\">🎯 Performance Analysis</h3>"
+        );
+
+        feedback = System.Text.RegularExpressions.Regex.Replace(
+            feedback,
+            @"💡\s*\*\*Key Improvements\*\*",
+            "<h3 class=\"feedback-section-header\">💡 Key Improvements</h3>"
+        );
+
+        feedback = System.Text.RegularExpressions.Regex.Replace(
+            feedback,
+            @"🚀\s*\*\*Action Plan\*\*",
+            "<h3 class=\"feedback-section-header\">🚀 Action Plan</h3>"
+        );
+
+        // Convert bullet points to proper HTML lists
+        var lines = feedback.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var result = new System.Text.StringBuilder();
+        bool inList = false;
+
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+
+            if (trimmedLine.StartsWith("- ") || trimmedLine.StartsWith("• "))
+            {
+                if (!inList)
+                {
+                    result.Append("<ul class=\"feedback-list\">");
+                    inList = true;
+                }
+                result.Append($"<li>{trimmedLine.Substring(2).Trim()}</li>");
+            }
+            else if (trimmedLine.Contains("<h3"))
+            {
+                if (inList)
+                {
+                    result.Append("</ul>");
+                    inList = false;
+                }
+                result.Append(trimmedLine);
+            }
+            else if (!string.IsNullOrWhiteSpace(trimmedLine))
+            {
+                if (inList)
+                {
+                    result.Append("</ul>");
+                    inList = false;
+                }
+                result.Append($"<p class=\"feedback-paragraph\">{trimmedLine}</p>");
+            }
+        }
+
+        if (inList)
+        {
+            result.Append("</ul>");
+        }
+
+        return result.ToString();
+    }
+
+    // When no stats are available at all, call the same OpenAI endpoint with zeros to obtain general guidance.
+    private async Task<string> GenerateNoDataFeedback(string scope)
+    {
+        try
+        {
+            var text = await OpenAIService.GenerateStatsFeedback(0, 0, 0, 0, 0, scope);
+            var formattedFeedback = FormatAIFeedback(text);
+            return $"<div class=\"feedback-title\">{scope}:</div><div class=\"ai-feedback-content\">{formattedFeedback}</div>";
+        }
+        catch
+        {
+            return $"<div class=\"feedback-title\">{scope}:</div><div class=\"ai-feedback-content\"><p class=\"feedback-paragraph\">We couldn't retrieve gameplay stats for this profile. If this is your account, ensure your Fortnite profile allows leaderboard/stat visibility, play a few Battle Royale matches, then try again.</p></div>";
+        }
+    }
+}
+
+<script src="~/js/tabs.js"></script>
+
+@functions {
+    private string GetBestMode()
+    {
+        if (Model?.GlobalStats == null) return "N/A";
+        
+        var soloWinRate = Model.GlobalStats.Solo?.MatchesPlayed > 0 ? (double)(Model.GlobalStats.Solo?.PlaceTop1 ?? 0) / Model.GlobalStats.Solo.MatchesPlayed : 0;
+        var duoWinRate = Model.GlobalStats.Duo?.MatchesPlayed > 0 ? (double)(Model.GlobalStats.Duo?.PlaceTop1 ?? 0) / Model.GlobalStats.Duo.MatchesPlayed : 0;
+        var squadWinRate = Model.GlobalStats.Squad?.MatchesPlayed > 0 ? (double)(Model.GlobalStats.Squad?.PlaceTop1 ?? 0) / Model.GlobalStats.Squad.MatchesPlayed : 0;
+        
+        if (soloWinRate >= duoWinRate && soloWinRate >= squadWinRate) return "Solo";
+        if (duoWinRate >= squadWinRate) return "Duo";
+        return "Squad";
+    }
+}
+
