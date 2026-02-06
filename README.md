@@ -39,7 +39,7 @@
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/zackmoyal/FortniteStatsAnalyzer.git
+   git clone https://github.com/zackmoyal/Fortnite-Stats-Analyzer.git
    ```
 
 2. Navigate into the project directory:
@@ -84,7 +84,7 @@ Create a file named `appsettings.Development.json` in the root directory (this f
 
 ## 🌐 Deployment
 
-This app is deployed using Docker on [Azure](https://).
+This app is deployed on [Azure](fortnite-stats-analyzer-hqbud5cyhzfnargg.eastus-01.azurewebsites.net).
 
 ### Environment Variables for Production
 Set the following environment variables in your hosting platform:
