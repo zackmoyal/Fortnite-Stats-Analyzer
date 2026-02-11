@@ -1,26 +1,37 @@
 ﻿@{
     ViewData["Title"] = "Privacy Policy";
 }
-
 <div class="privacy-section">
     <h1>Privacy Policy</h1>
-
     <p>At Fortnite Stats Analyzer, your privacy is important to us. This page outlines how we handle data and use third-party services in relation to your interaction with our website.</p>
 
     <h2>Information We Do Not Collect</h2>
     <p>We do not collect any personal information such as your name, email address, or IP address when you use this website. Our website operates without the need for user registration or providing any form of identifying information.</p>
 
     <h2>Third-Party Services</h2>
-    <p>Our site uses the <strong>FortniteAPI.io</strong> service to retrieve Fortnite player statistics. This means that when you enter a Fortnite username to get stats, that information is passed to FortniteAPI.io for processing. We do not store or log any data that is transmitted to or from FortniteAPI.io.</p>
-    <p>For more information on how FortniteAPI.io handles your data, please refer to their <a href="https://fortniteapi.io/tnc" target="_blank">Terms and Conditions</a>.</p>
+
+    <h3>Fortnite API</h3>
+    <p>Our site uses the <strong>Fortnite-API.com</strong> service to retrieve Fortnite player statistics. When you enter a Fortnite username to get stats, that information is passed to Fortnite-API.com for processing. We do not store or log any data that is transmitted to or from Fortnite-API.com.</p>
+    <p>For more information on how Fortnite-API.com handles your data, please refer to their <a href="https://fortnite-api.com/privacy" target="_blank">Privacy Policy</a>.</p>
+
+    <h3>OpenAI</h3>
+    <p>We use <strong>OpenAI's API</strong> to generate personalized AI feedback and coaching tips based on your Fortnite statistics. The player statistics (such as K/D ratio, win rate, and match data ) are sent to OpenAI for analysis. OpenAI does not store or use this data to train their models. For more information, see <a href="https://openai.com/policies/privacy-policy" target="_blank">OpenAI's Privacy Policy</a>.</p>
+
+    <h2>Data Caching</h2>
+    <p>To improve performance and reduce API costs, we temporarily cache Fortnite statistics and AI-generated feedback on our servers:</p>
+    <ul>
+        <li><strong>Fortnite stats:</strong> Cached for 5 minutes</li>
+        <li><strong>AI feedback:</strong> Cached for 1 hour</li>
+    </ul>
+    <p>This cached data is stored in server memory only and is automatically deleted after the expiration time. We do not permanently store any player statistics or AI feedback.</p>
 
     <h2>Security</h2>
-    <p>Our website operates using HTTPS to ensure that the data you input (such as Fortnite usernames) is encrypted and secure during transmission.</p>
+    <p>Our website operates using HTTPS to ensure that the data you input (such as Fortnite usernames ) is encrypted and secure during transmission.</p>
 
     <h2>Changes to This Privacy Policy</h2>
     <p>We reserve the right to update this Privacy Policy as necessary. Any changes will be posted on this page, and the date of the latest revision will be updated below.</p>
 
-    <p><strong>Last updated:</strong> 11/03/2024</p>
+    <p><strong>Last updated:</strong> 02/04/2026</p>
 </div>
 
 <style>
@@ -35,18 +46,31 @@
         font-family: 'FortniteBold', sans-serif;
     }
 
-    h1, h2 {
+    h1, h2, h3 {
         color: #feda4a;
         text-align: center;
         margin-bottom: 20px;
         text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
     }
 
-    p {
+    h3 {
+        font-size: 1.8rem;
+        margin-top: 15px;
+    }
+
+    p, ul {
         font-size: 1.6rem;
         margin-bottom: 20px;
         line-height: 1.5;
         text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.8);
+    }
+
+    ul {
+        margin-left: 40px;
+    }
+
+    li {
+        margin-bottom: 10px;
     }
 
     a {
@@ -54,7 +78,7 @@
         text-decoration: none;
     }
 
-    a:hover {
-        text-decoration: underline;
-    }
+        a:hover {
+            text-decoration: underline;
+        }
 </style>
